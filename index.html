@@ -1201,45 +1201,11 @@ function submitTx() {
   document.getElementById('f-value').value = '';
 }
 
-/* ─── Auto Fixed Expenses ────────────────────────────────────────────────── */
+/* ─── Auto Fixed Expenses (desativado — usuário lança manualmente) ────────── */
 
 function checkNewMonth() {
-  const mk = curMonth();
-  if (state.settings.lastMonthCheck === mk) return;
-  const hasFixed = state.transactions.some(t => monthKey(t.date) === mk && t.fixed);
-  if (hasFixed) {
-    state.settings.lastMonthCheck = mk;
-    saveSt();
-    return;
-  }
-  showModal(
-    '📅 Novo mês!',
-    `É ${monthLabelFull(mk)}. Deseja lançar automaticamente as despesas fixas e a renda?`,
-    [
-      { label: 'Sim, lançar!', primary: true, action: () => { closeModal(); launchFixed(); } },
-      { label: 'Agora não', action: () => {
-          state.settings.lastMonthCheck = mk; saveSt(); closeModal();
-        }
-      },
-    ]
-  );
-}
-
-function launchFixed() {
-  const mk = curMonth();
-  const d  = today();
-  FIXED_INCOME.forEach(fi => {
-    if (fi.until && fi.until < mk) return;
-    state.transactions.push({ id:uid(), type:'income',  description:fi.d, value:fi.v, date:d, category:fi.c, fixed:true });
-  });
-  FIXED_EXPENSES.forEach(fe => {
-    state.transactions.push({ id:uid(), type:'expense', description:fe.d, value:fe.v, date:d, category:fe.c, fixed:true });
-  });
-  state.settings.lastMonthCheck = mk;
-  saveTx(); saveSt();
-  updateHeader(); checkAlerts();
-  toast(`✅ ${FIXED_INCOME.length + FIXED_EXPENSES.length} lançamentos criados!`, 3000);
-  if (activeTab === 'resumo') renderResumo();
+  // Lançamento automático removido a pedido do usuário.
+  // As despesas fixas são lançadas manualmente conforme debitadas na conta.
 }
 
 /* ─── RESUMO render ──────────────────────────────────────────────────────── */
@@ -1573,7 +1539,7 @@ function renderPlanning() {
   </div>
 
   <div style="margin-bottom:8px">
-    <button class="btn btn-outline" onclick="relaunchFixed()">🔄 Relançar despesas fixas do mês</button>
+
   </div>`;
 
   document.getElementById('plan-root').innerHTML = h;
@@ -1623,21 +1589,7 @@ function openCarModal() {
   );
 }
 
-function relaunchFixed() {
-  showModal(
-    '🔄 Relançar despesas fixas',
-    'Isso irá adicionar novamente todas as despesas fixas e a renda para este mês. Confirmar?',
-    [
-      { label: 'Confirmar', primary: true, action: () => {
-          state.settings.lastMonthCheck = '';
-          closeModal(); launchFixed();
-          if (activeTab === 'planejamento') setTimeout(renderPlanning, 100);
-        }
-      },
-      { label: 'Cancelar', action: closeModal },
-    ]
-  );
-}
+
 
 /* ─── Modal ──────────────────────────────────────────────────────────────── */
 
