@@ -507,4 +507,45 @@ function renderPlano(){
     diag+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"><span class="badge blue">50% Necessidades</span><span class="badge" style="background:#78350f;color:#fcd34d">30% Qualidade de vida</span><span class="badge green">20% Investimentos</span></div>';
     var invIdeal=t.e*0.2;var invPct=Math.min(t.i/invIdeal*100,100);
     diag+='<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Meta de investimento: '+fmt(invIdeal)+'/mês</div>';
-    diag+='<div class="progress-bar"><div class="progress-fill" style="width:'+invPct+'%;background:'+(invPct>=100?'var(-
+    diag+='<div class="progress-bar"><div class="progress-fill" style="width:'+invPct+'%;background:'+(invPct>=100?'var(--green)':invPct>=50?'var(--acc2)':'var(--red)')+'"></div></div>';
+    diag+='<div style="font-size:11px;color:var(--text3);margin-top:5px">Investido: '+fmt(t.i)+(t.i>=invIdeal?' ✅':' — faltam '+fmt(invIdeal-t.i))+'</div>';
+  }
+  document.getElementById('diag').innerHTML=diag;
+  var ml='';
+  for(var c=0;c<S.cats.length;c++){var cat=S.cats[c];var meta=S.metas[cat]||0;var gasto=gastos[cat]||0;
+    var pct=meta>0?Math.min(gasto/meta*100,100):0;
+    var corB=pct>=100?'var(--red)':pct>=80?'var(--amber)':'var(--acc2)';
+    ml+='<div class="plan-item"><div class="plan-top"><span class="plan-cat">'+(CAT_ICONS[cat]||'📦')+' '+cat+'</span><span class="plan-vals">'+fmt(gasto)+' / '+(meta>0?fmt(meta):'sem meta')+'</span></div>'+(meta>0?'<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%;background:'+corB+'"></div></div>':'')+'</div>';
+  }
+  document.getElementById('metas-lista').innerHTML=ml;
+}
+
+function renderConfig(){
+  document.getElementById('saldo-init').value=S.saldo;
+  var ct='';for(var i=0;i<S.cats.length;i++)ct+='<span class="cat-tag">'+S.cats[i]+'<button onclick="removeCat(\''+S.cats[i]+'\')">&times;</button></span>';
+  document.getElementById('cat-list').innerHTML=ct;
+  var mc='';for(var j=0;j<S.cats.length;j++){var c=S.cats[j];
+    mc+='<div class="fg" style="margin-bottom:8px"><label>'+(CAT_ICONS[c]||'📦')+' '+c+'</label><input type="number" placeholder="Limite R$/mês" value="'+(S.metas[c]||'')+'" step="10" inputmode="decimal" onchange="S.metas[\''+c+'\']=parseFloat(this.value)||0;save()"></div>';}
+  document.getElementById('metas-config').innerHTML=mc;
+}
+
+function salvarSaldo(){
+  var v=parseFloat(document.getElementById('saldo-init').value);
+  if(isNaN(v)){alert('Valor inválido');return}
+  S.saldo=v;save();renderDash();alert('Saldo salvo!');
+}
+function addCat(){
+  var inp=document.getElementById('nova-cat');var v=inp.value.trim();
+  if(!v||S.cats.indexOf(v)>-1){alert(v?'Categoria já existe.':'Digite um nome.');return}
+  S.cats.push(v);save();inp.value='';renderConfig();
+}
+function removeCat(c){
+  if(!confirm('Remover "'+c+'"?'))return;
+  S.cats=S.cats.filter(function(x){return x!==c});delete S.metas[c];save();renderConfig();
+}
+function resetar(){S={saldo:0,items:[],cats:CAT_DEFAULT.slice(),metas:{}};save();renderDash();}
+
+renderDash();
+</script>
+</body>
+</html>
