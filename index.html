@@ -182,6 +182,24 @@ input[type=checkbox]{width:18px;height:18px;accent-color:var(--acc)}
         <div class="metric"><div class="lbl">Total aplicado</div><div class="val blue" id="inv-total">R$ 0,00</div></div>
         <div class="metric"><div class="lbl">Tipos ativos</div><div class="val" id="inv-tipos">0</div></div>
       </div>
+
+      <div class="card accent">
+        <div class="section-title">＋ Aporte sem descontar da conta</div>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Use para registrar investimentos que você já possui ou que não saíram desta conta corrente. Não afeta o saldo da conta.</p>
+        <div class="row2">
+          <div class="fg" style="margin-bottom:10px"><label>Valor (R$)</label><input type="number" id="ae-valor" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+          <div class="fg" style="margin-bottom:10px"><label>Data</label><input type="date" id="ae-data"></div>
+        </div>
+        <div class="fg" style="margin-bottom:10px"><label>Tipo de investimento</label>
+          <select id="ae-inv">
+            <option>CDB</option><option>Tesouro Direto</option><option>LCI/LCA</option>
+            <option>Ações</option><option>FIIs</option><option>Crypto</option><option>Poupança</option><option>Outro</option>
+          </select>
+        </div>
+        <div class="fg" style="margin-bottom:12px"><label>Descrição (opcional)</label><input type="text" id="ae-desc" placeholder="Ex: Carteira na corretora"></div>
+        <button class="btn primary" onclick="salvarAporteExterno()">Adicionar aporte externo</button>
+      </div>
+
       <div class="card" id="card-pie">
         <div class="section-title">Composição da carteira</div>
         <div style="position:relative;width:100%;height:200px"><canvas id="pieChart"></canvas></div>
@@ -277,14 +295,18 @@ function mesAtual(){var n=new Date();return n.getFullYear()+'-'+String(n.getMont
 
 function saldoCC(){
   var s=S.saldo;
-  for(var i=0;i<S.items.length;i++){var l=S.items[i];if(l.t==='e')s+=l.v;else s-=l.v;}
+  for(var i=0;i<S.items.length;i++){var l=S.items[i];
+    if(l.t==='e')s+=l.v;
+    else if(l.t==='s'||l.t==='i')s-=l.v;
+    // l.t==='x' (aporte externo) NÃO desconta da conta corrente
+  }
   return s;
 }
 function totaisMes(m){
   var e=0,s=0,inv=0;
   for(var i=0;i<S.items.length;i++){var l=S.items[i];
     if(m&&l.d.substring(0,7)!==m)continue;
-    if(l.t==='e')e+=l.v;else if(l.t==='s')s+=l.v;else inv+=l.v;}
+    if(l.t==='e')e+=l.v;else if(l.t==='s')s+=l.v;else if(l.t==='i'||l.t==='x')inv+=l.v;}
   return{e:e,s:s,i:inv};
 }
 
@@ -295,7 +317,7 @@ function tab(t,el){
   el.classList.add('active');
   if(t==='dash')renderDash();
   else if(t==='lanc'){popFiltroMes();renderLista();}
-  else if(t==='inv')renderInv();
+  else if(t==='inv'){var aed=document.getElementById('ae-data');if(!aed.value)aed.value=new Date().toISOString().split('T')[0];renderInv();}
   else if(t==='plano')renderPlano();
   else if(t==='config')renderConfig();
 }
@@ -342,16 +364,18 @@ function excluir(id){
 }
 
 function montaItem(l){
-  var cor=l.t==='e'?'var(--green)':l.t==='i'?'var(--acc2)':'var(--red)';
-  var bg=l.t==='e'?'#14532d':l.t==='i'?'#1e3a5f':'#7f1d1d';
-  var sinal=l.t==='e'?'+':'-';
-  var icon=l.t==='i'?(CAT_ICONS[l.inv]||'📊'):(CAT_ICONS[l.cat]||'📦');
-  var label=l.t==='i'?l.inv:l.cat;
-  var badge=l.t==='e'?'green':l.t==='i'?'blue':'red';
+  var ehInv=(l.t==='i'||l.t==='x');
+  var cor=l.t==='e'?'var(--green)':ehInv?'var(--acc2)':'var(--red)';
+  var bg=l.t==='e'?'#14532d':ehInv?'#1e3a5f':'#7f1d1d';
+  var sinal=l.t==='e'?'+':ehInv?'+':'-';
+  var icon=ehInv?(CAT_ICONS[l.inv]||'📊'):(CAT_ICONS[l.cat]||'📦');
+  var label=ehInv?l.inv:l.cat;
+  var badge=l.t==='e'?'green':ehInv?'blue':'red';
+  var extra=l.t==='x'?' · 💼 externo':'';
   var div=document.createElement('div');div.className='item';
   div.innerHTML='<div class="ic" style="background:'+bg+'">'+icon+'</div>'+
     '<div class="info"><div class="desc">'+l.desc+'</div>'+
-    '<div class="meta">'+new Date(l.d+'T00:00').toLocaleDateString('pt-BR')+' · <span class="badge '+badge+'">'+label+'</span>'+(l.rec?' · 🔄':'')+'</div></div>'+
+    '<div class="meta">'+new Date(l.d+'T00:00').toLocaleDateString('pt-BR')+' · <span class="badge '+badge+'">'+label+'</span>'+(l.rec?' · 🔄':'')+extra+'</div></div>'+
     '<div class="amt" style="color:'+cor+'">'+sinal+fmt(l.v)+'</div>';
   var btn=document.createElement('button');btn.className='del';btn.textContent='🗑';
   btn.onclick=function(){excluir(l.id)};div.appendChild(btn);
@@ -370,7 +394,7 @@ function renderDash(){
   document.getElementById('m-entradas').textContent=fmt(t.e);
   document.getElementById('m-saidas').textContent=fmt(t.s);
   document.getElementById('m-invest').textContent=fmt(t.i);
-  var allInv=S.items.filter(function(l){return l.t==='i'}).reduce(function(a,b){return a+b.v},0);
+  var allInv=S.items.filter(function(l){return l.t==='i'||l.t==='x'}).reduce(function(a,b){return a+b.v},0);
   document.getElementById('m-patrim').textContent=fmt(Math.max(0,scc)+allInv);
   renderAlertas(mes);
   var rl=document.getElementById('recentes');rl.innerHTML='';
@@ -421,7 +445,10 @@ function renderLista(){
   var ft=document.getElementById('f-tipo').value;
   var lista=S.items.filter(function(l){
     if(fm&&l.d.substring(0,7)!==fm)return false;
-    if(ft&&l.t!==ft)return false;
+    if(ft){
+      if(ft==='i'){if(l.t!=='i'&&l.t!=='x')return false;}
+      else if(l.t!==ft)return false;
+    }
     return true;
   });
   var ul=document.getElementById('lista');ul.innerHTML='';
@@ -431,12 +458,12 @@ function renderLista(){
 
 function renderInv(){
   var invs={};
-  S.items.filter(function(l){return l.t==='i'}).forEach(function(l){invs[l.inv]=(invs[l.inv]||0)+l.v});
+  S.items.filter(function(l){return l.t==='i'||l.t==='x'}).forEach(function(l){invs[l.inv]=(invs[l.inv]||0)+l.v});
   var total=Object.keys(invs).reduce(function(a,k){return a+invs[k]},0);
   document.getElementById('inv-total').textContent=fmt(total);
   document.getElementById('inv-tipos').textContent=Object.keys(invs).length;
   var ul=document.getElementById('inv-lista');ul.innerHTML='';
-  var items=S.items.filter(function(l){return l.t==='i'});
+  var items=S.items.filter(function(l){return l.t==='i'||l.t==='x'});
   if(items.length){for(var i=0;i<items.length;i++)ul.appendChild(montaItem(items[i]));}
   else ul.innerHTML='<div class="empty">Nenhum investimento registrado.</div>';
   if(!hasChart){document.getElementById('card-pie').style.display='none';return}
@@ -447,6 +474,20 @@ function renderInv(){
   pieCh=new Chart(document.getElementById('pieChart'),{type:'doughnut',data:{labels:labels,datasets:[{data:labels.map(function(k){return invs[k]}),backgroundColor:PALETTE.slice(0,labels.length),borderWidth:2,borderColor:'#111827'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.label+': '+fmt(c.raw)+' ('+Math.round(c.raw/total*100)+'%)'}}}}}});
   var leg='';for(var k=0;k<labels.length;k++)leg+='<span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:3px;background:'+PALETTE[k]+';display:inline-block"></span>'+labels[k]+' '+Math.round(invs[labels[k]]/total*100)+'%</span>';
   document.getElementById('pie-leg').innerHTML=leg;
+}
+
+function salvarAporteExterno(){
+  var v=parseFloat(document.getElementById('ae-valor').value);
+  var d=document.getElementById('ae-data').value;
+  if(!v||v<=0){alert('Informe um valor válido.');return}
+  if(!d){alert('Informe a data.');return}
+  var desc=document.getElementById('ae-desc').value.trim()||'Aporte externo';
+  var l={id:Date.now(),t:'x',desc:desc,v:v,d:d,inv:document.getElementById('ae-inv').value,rec:false};
+  S.items.unshift(l);save();
+  document.getElementById('ae-valor').value='';
+  document.getElementById('ae-desc').value='';
+  renderInv();
+  alert('Aporte adicionado sem afetar a conta corrente!');
 }
 
 function renderPlano(){
@@ -466,45 +507,4 @@ function renderPlano(){
     diag+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"><span class="badge blue">50% Necessidades</span><span class="badge" style="background:#78350f;color:#fcd34d">30% Qualidade de vida</span><span class="badge green">20% Investimentos</span></div>';
     var invIdeal=t.e*0.2;var invPct=Math.min(t.i/invIdeal*100,100);
     diag+='<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Meta de investimento: '+fmt(invIdeal)+'/mês</div>';
-    diag+='<div class="progress-bar"><div class="progress-fill" style="width:'+invPct+'%;background:'+(invPct>=100?'var(--green)':invPct>=50?'var(--acc2)':'var(--red)')+'"></div></div>';
-    diag+='<div style="font-size:11px;color:var(--text3);margin-top:5px">Investido: '+fmt(t.i)+(t.i>=invIdeal?' ✅':' — faltam '+fmt(invIdeal-t.i))+'</div>';
-  }
-  document.getElementById('diag').innerHTML=diag;
-  var ml='';
-  for(var c=0;c<S.cats.length;c++){var cat=S.cats[c];var meta=S.metas[cat]||0;var gasto=gastos[cat]||0;
-    var pct=meta>0?Math.min(gasto/meta*100,100):0;
-    var corB=pct>=100?'var(--red)':pct>=80?'var(--amber)':'var(--acc2)';
-    ml+='<div class="plan-item"><div class="plan-top"><span class="plan-cat">'+(CAT_ICONS[cat]||'📦')+' '+cat+'</span><span class="plan-vals">'+fmt(gasto)+' / '+(meta>0?fmt(meta):'sem meta')+'</span></div>'+(meta>0?'<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%;background:'+corB+'"></div></div>':'')+'</div>';
-  }
-  document.getElementById('metas-lista').innerHTML=ml;
-}
-
-function renderConfig(){
-  document.getElementById('saldo-init').value=S.saldo;
-  var ct='';for(var i=0;i<S.cats.length;i++)ct+='<span class="cat-tag">'+S.cats[i]+'<button onclick="removeCat(\''+S.cats[i]+'\')">&times;</button></span>';
-  document.getElementById('cat-list').innerHTML=ct;
-  var mc='';for(var j=0;j<S.cats.length;j++){var c=S.cats[j];
-    mc+='<div class="fg" style="margin-bottom:8px"><label>'+(CAT_ICONS[c]||'📦')+' '+c+'</label><input type="number" placeholder="Limite R$/mês" value="'+(S.metas[c]||'')+'" step="10" inputmode="decimal" onchange="S.metas[\''+c+'\']=parseFloat(this.value)||0;save()"></div>';}
-  document.getElementById('metas-config').innerHTML=mc;
-}
-
-function salvarSaldo(){
-  var v=parseFloat(document.getElementById('saldo-init').value);
-  if(isNaN(v)){alert('Valor inválido');return}
-  S.saldo=v;save();renderDash();alert('Saldo salvo!');
-}
-function addCat(){
-  var inp=document.getElementById('nova-cat');var v=inp.value.trim();
-  if(!v||S.cats.indexOf(v)>-1){alert(v?'Categoria já existe.':'Digite um nome.');return}
-  S.cats.push(v);save();inp.value='';renderConfig();
-}
-function removeCat(c){
-  if(!confirm('Remover "'+c+'"?'))return;
-  S.cats=S.cats.filter(function(x){return x!==c});delete S.metas[c];save();renderConfig();
-}
-function resetar(){S={saldo:0,items:[],cats:CAT_DEFAULT.slice(),metas:{}};save();renderDash();}
-
-renderDash();
-</script>
-</body>
-</html>
+    diag+='<div class="progress-bar"><div class="progress-fill" style="width:'+invPct+'%;background:'+(invPct>=100?'var(-
