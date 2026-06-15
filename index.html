@@ -255,11 +255,18 @@ input[type=checkbox]{width:18px;height:18px;accent-color:var(--acc)}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-var CAT_ICONS={'Alimentação':'🍔','Transporte':'🚗','Moradia':'🏠','Saúde':'💊','Educação':'📚','Lazer':'🎉','Vestuário':'👕','Serviços':'⚙️','Outros':'📦','Salário':'💼','Freelance':'💻','Investimento resgatado':'💰','CDB':'🏦','Tesouro Direto':'🏛️','LCI/LCA':'🏦','Ações':'📈','FIIs':'🏢','Crypto':'₿','Poupança':'💰','Outro':'📊'};
+var CAT_ICONS={'Alimentação':'🍔','Delivery':'🛵','Transporte':'🚗','Moradia':'🏠','Saúde':'💊','Educação':'📚','Lazer':'🎉','Vestuário':'👕','Serviços':'⚙️','Outros':'📦','Salário':'💼','Freelance':'💻','Investimento resgatado':'💰','CDB':'🏦','Tesouro Direto':'🏛️','LCI/LCA':'🏦','Ações':'📈','FIIs':'🏢','Crypto':'₿','Poupança':'💰','Outro':'📊'};
 var PALETTE=['#3b82f6','#22c55e','#ef4444','#f59e0b','#a78bfa','#ec4899','#06b6d4','#f97316','#84cc16'];
-var CAT_DEFAULT=['Alimentação','Transporte','Moradia','Saúde','Educação','Lazer','Vestuário','Serviços','Outros'];
+var CAT_DEFAULT=['Alimentação','Delivery','Transporte','Moradia','Saúde','Educação','Lazer','Vestuário','Serviços','Outros'];
 
 var S=JSON.parse(localStorage.getItem('finapp_v6')||'null')||{saldo:0,items:[],cats:CAT_DEFAULT.slice(),metas:{}};
+// Garante que "Delivery" exista para quem já tem dados salvos, sem apagar nada
+if(S.cats.indexOf('Delivery')===-1){
+  var iAlim=S.cats.indexOf('Alimentação');
+  if(iAlim>-1)S.cats.splice(iAlim+1,0,'Delivery');
+  else S.cats.push('Delivery');
+  save();
+}
 var tipoAtual='entrada';
 var catCh=null,pieCh=null;
 var hasChart=(typeof Chart!=='undefined');
