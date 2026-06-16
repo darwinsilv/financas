@@ -72,6 +72,7 @@ html,body{height:100%;background:var(--bg0);color:var(--text1);font-family:-appl
 .badge.green{background:#14532d;color:#86efac}
 .badge.red{background:#7f1d1d;color:#fca5a5}
 .badge.blue{background:#1e3a5f;color:#93c5fd}
+.badge.amber{background:#78350f;color:#fcd34d}
 .progress-bar{height:6px;border-radius:3px;background:var(--bg3);margin-top:6px;overflow:hidden}
 .progress-fill{height:100%;border-radius:3px}
 .plan-item{padding:10px 0;border-bottom:1px solid var(--border)}
@@ -140,8 +141,7 @@ input[type=checkbox]{width:18px;height:18px;accent-color:var(--acc)}
       <div class="metric-grid">
         <div class="metric"><div class="lbl">⬇️ Entradas (mês)</div><div class="val green" id="m-entradas">R$ 0,00</div></div>
         <div class="metric"><div class="lbl">⬆️ Saídas (mês)</div><div class="val red" id="m-saidas">R$ 0,00</div></div>
-        <div class="metric"><div class="lbl">📈 Investido (mês)</div><div class="val blue" id="m-invest">R$ 0,00</div></div>
-        <div class="metric"><div class="lbl">💎 Patrimônio</div><div class="val amber" id="m-patrim">R$ 0,00</div></div>
+        <div class="metric" style="grid-column:1/-1"><div class="lbl">📈 Investido (mês)</div><div class="val blue" id="m-invest">R$ 0,00</div></div>
       </div>
 
       <div id="alertas"></div>
@@ -198,6 +198,23 @@ input[type=checkbox]{width:18px;height:18px;accent-color:var(--acc)}
         </div>
         <div class="fg" style="margin-bottom:12px"><label>Descrição (opcional)</label><input type="text" id="ae-desc" placeholder="Ex: Carteira na corretora"></div>
         <button class="btn primary" onclick="salvarAporteExterno()">Adicionar aporte externo</button>
+      </div>
+
+      <div class="card accent">
+        <div class="section-title">↩️ Baixar valor investido</div>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Resgate: o valor sai do investimento e entra na sua conta corrente.</p>
+        <div class="row2">
+          <div class="fg" style="margin-bottom:10px"><label>Valor (R$)</label><input type="number" id="rg-valor" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+          <div class="fg" style="margin-bottom:10px"><label>Data</label><input type="date" id="rg-data"></div>
+        </div>
+        <div class="fg" style="margin-bottom:10px"><label>De qual investimento</label>
+          <select id="rg-inv">
+            <option>CDB</option><option>Tesouro Direto</option><option>LCI/LCA</option>
+            <option>Ações</option><option>FIIs</option><option>Crypto</option><option>Poupança</option><option>Outro</option>
+          </select>
+        </div>
+        <div class="fg" style="margin-bottom:12px"><label>Descrição (opcional)</label><input type="text" id="rg-desc" placeholder="Ex: Resgate emergência"></div>
+        <button class="btn primary" onclick="salvarResgate()">Baixar para conta corrente</button>
       </div>
 
       <div class="card" id="card-pie">
@@ -298,6 +315,7 @@ function saldoCC(){
   for(var i=0;i<S.items.length;i++){var l=S.items[i];
     if(l.t==='e')s+=l.v;
     else if(l.t==='s'||l.t==='i')s-=l.v;
+    else if(l.t==='r')s+=l.v;
     // l.t==='x' (aporte externo) NÃO desconta da conta corrente
   }
   return s;
@@ -306,7 +324,7 @@ function totaisMes(m){
   var e=0,s=0,inv=0;
   for(var i=0;i<S.items.length;i++){var l=S.items[i];
     if(m&&l.d.substring(0,7)!==m)continue;
-    if(l.t==='e')e+=l.v;else if(l.t==='s')s+=l.v;else if(l.t==='i'||l.t==='x')inv+=l.v;}
+    if(l.t==='e')e+=l.v;else if(l.t==='s')s+=l.v;else if(l.t==='i'||l.t==='x')inv+=l.v;else if(l.t==='r')inv-=l.v;}
   return{e:e,s:s,i:inv};
 }
 
@@ -317,7 +335,7 @@ function tab(t,el){
   el.classList.add('active');
   if(t==='dash')renderDash();
   else if(t==='lanc'){popFiltroMes();renderLista();}
-  else if(t==='inv'){var aed=document.getElementById('ae-data');if(!aed.value)aed.value=new Date().toISOString().split('T')[0];renderInv();}
+  else if(t==='inv'){var aed=document.getElementById('ae-data');if(!aed.value)aed.value=new Date().toISOString().split('T')[0];var rgd=document.getElementById('rg-data');if(!rgd.value)rgd.value=new Date().toISOString().split('T')[0];renderInv();}
   else if(t==='plano')renderPlano();
   else if(t==='config')renderConfig();
 }
@@ -364,14 +382,11 @@ function excluir(id){
 }
 
 function montaItem(l){
-  var ehInv=(l.t==='i'||l.t==='x');
-  var cor=l.t==='e'?'var(--green)':ehInv?'var(--acc2)':'var(--red)';
-  var bg=l.t==='e'?'#14532d':ehInv?'#1e3a5f':'#7f1d1d';
-  var sinal=l.t==='e'?'+':ehInv?'+':'-';
-  var icon=ehInv?(CAT_ICONS[l.inv]||'📊'):(CAT_ICONS[l.cat]||'📦');
-  var label=ehInv?l.inv:l.cat;
-  var badge=l.t==='e'?'green':ehInv?'blue':'red';
-  var extra=l.t==='x'?' · 💼 externo':'';
+  var cor,bg,sinal,icon,label,badge,extra='';
+  if(l.t==='e'){cor='var(--green)';bg='#14532d';sinal='+';icon=CAT_ICONS[l.cat]||'📦';label=l.cat;badge='green';}
+  else if(l.t==='i'||l.t==='x'){cor='var(--acc2)';bg='#1e3a5f';sinal='+';icon=CAT_ICONS[l.inv]||'📊';label=l.inv;badge='blue';if(l.t==='x')extra=' · 💼 externo';}
+  else if(l.t==='r'){cor='var(--amber)';bg='#78350f';sinal='+';icon='↩️';label=l.inv+' (resgate)';badge='amber';extra=' · 🏦 p/ conta';}
+  else{cor='var(--red)';bg='#7f1d1d';sinal='-';icon=CAT_ICONS[l.cat]||'📦';label=l.cat;badge='red';}
   var div=document.createElement('div');div.className='item';
   div.innerHTML='<div class="ic" style="background:'+bg+'">'+icon+'</div>'+
     '<div class="info"><div class="desc">'+l.desc+'</div>'+
@@ -394,8 +409,6 @@ function renderDash(){
   document.getElementById('m-entradas').textContent=fmt(t.e);
   document.getElementById('m-saidas').textContent=fmt(t.s);
   document.getElementById('m-invest').textContent=fmt(t.i);
-  var allInv=S.items.filter(function(l){return l.t==='i'||l.t==='x'}).reduce(function(a,b){return a+b.v},0);
-  document.getElementById('m-patrim').textContent=fmt(Math.max(0,scc)+allInv);
   renderAlertas(mes);
   var rl=document.getElementById('recentes');rl.innerHTML='';
   var recent=S.items.slice(0,6);
@@ -446,7 +459,7 @@ function renderLista(){
   var lista=S.items.filter(function(l){
     if(fm&&l.d.substring(0,7)!==fm)return false;
     if(ft){
-      if(ft==='i'){if(l.t!=='i'&&l.t!=='x')return false;}
+      if(ft==='i'){if(l.t!=='i'&&l.t!=='x'&&l.t!=='r')return false;}
       else if(l.t!==ft)return false;
     }
     return true;
@@ -458,18 +471,22 @@ function renderLista(){
 
 function renderInv(){
   var invs={};
-  S.items.filter(function(l){return l.t==='i'||l.t==='x'}).forEach(function(l){invs[l.inv]=(invs[l.inv]||0)+l.v});
-  var total=Object.keys(invs).reduce(function(a,k){return a+invs[k]},0);
+  S.items.forEach(function(l){
+    if(l.t==='i'||l.t==='x')invs[l.inv]=(invs[l.inv]||0)+l.v;
+    else if(l.t==='r')invs[l.inv]=(invs[l.inv]||0)-l.v;
+  });
+  var posTypes=Object.keys(invs).filter(function(k){return invs[k]>0.005});
+  var total=posTypes.reduce(function(a,k){return a+invs[k]},0);
   document.getElementById('inv-total').textContent=fmt(total);
-  document.getElementById('inv-tipos').textContent=Object.keys(invs).length;
+  document.getElementById('inv-tipos').textContent=posTypes.length;
   var ul=document.getElementById('inv-lista');ul.innerHTML='';
-  var items=S.items.filter(function(l){return l.t==='i'||l.t==='x'});
+  var items=S.items.filter(function(l){return l.t==='i'||l.t==='x'||l.t==='r'});
   if(items.length){for(var i=0;i<items.length;i++)ul.appendChild(montaItem(items[i]));}
   else ul.innerHTML='<div class="empty">Nenhum investimento registrado.</div>';
   if(!hasChart){document.getElementById('card-pie').style.display='none';return}
   if(pieCh){pieCh.destroy();pieCh=null;}
   document.getElementById('pie-leg').innerHTML='';
-  var labels=Object.keys(invs);
+  var labels=posTypes;
   if(!labels.length)return;
   pieCh=new Chart(document.getElementById('pieChart'),{type:'doughnut',data:{labels:labels,datasets:[{data:labels.map(function(k){return invs[k]}),backgroundColor:PALETTE.slice(0,labels.length),borderWidth:2,borderColor:'#111827'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.label+': '+fmt(c.raw)+' ('+Math.round(c.raw/total*100)+'%)'}}}}}});
   var leg='';for(var k=0;k<labels.length;k++)leg+='<span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:3px;background:'+PALETTE[k]+';display:inline-block"></span>'+labels[k]+' '+Math.round(invs[labels[k]]/total*100)+'%</span>';
@@ -488,6 +505,27 @@ function salvarAporteExterno(){
   document.getElementById('ae-desc').value='';
   renderInv();
   alert('Aporte adicionado sem afetar a conta corrente!');
+}
+
+function salvarResgate(){
+  var v=parseFloat(document.getElementById('rg-valor').value);
+  var d=document.getElementById('rg-data').value;
+  if(!v||v<=0){alert('Informe um valor válido.');return}
+  if(!d){alert('Informe a data.');return}
+  var tipo=document.getElementById('rg-inv').value;
+  var disp=0;
+  S.items.forEach(function(l){
+    if((l.t==='i'||l.t==='x')&&l.inv===tipo)disp+=l.v;
+    else if(l.t==='r'&&l.inv===tipo)disp-=l.v;
+  });
+  if(v>disp){if(!confirm('Você tem apenas '+fmt(disp)+' investido em '+tipo+'.\nBaixar mesmo assim?'))return}
+  var desc=document.getElementById('rg-desc').value.trim()||('Resgate '+tipo);
+  var l={id:Date.now(),t:'r',desc:desc,v:v,d:d,inv:tipo,rec:false};
+  S.items.unshift(l);save();
+  document.getElementById('rg-valor').value='';
+  document.getElementById('rg-desc').value='';
+  renderInv();
+  alert('Resgate registrado! O valor entrou na conta corrente.');
 }
 
 function renderPlano(){
