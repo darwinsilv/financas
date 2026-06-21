@@ -288,6 +288,13 @@ input[type=checkbox]{width:18px;height:18px;accent-color:var(--acc)}
         <button class="btn primary" onclick="salvarResgate()">Baixar para conta corrente</button>
       </div>
 
+      <div class="card accent">
+        <div class="section-title">⚙️ Configurar Invest.</div>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Seu dinheiro rende direto no banco/corretora. Em vez de lançar cada rendimento, ajuste aqui o saldo atual de cada tipo — a diferença é registrada automaticamente como um ajuste de rendimento, sem afetar sua conta corrente.</p>
+        <div id="invcfg-list"></div>
+        <button class="btn small primary" style="margin-top:10px" onclick="salvarConfigInvest()">Salvar ajustes</button>
+      </div>
+
       <div class="card" id="card-pie">
         <div class="section-title">Composição da carteira</div>
         <div style="position:relative;width:100%;height:200px"><canvas id="pieChart"></canvas></div>
@@ -502,6 +509,7 @@ var CAT_ICONS={'Alimentação':'🍔','Delivery':'🛵','Transporte':'🚗','Mor
 var PALETTE=['#3b82f6','#22c55e','#ef4444','#f59e0b','#a78bfa','#ec4899','#06b6d4','#f97316','#84cc16'];
 var CAT_DEFAULT=['Alimentação','Delivery','Transporte','Moradia','Saúde','Educação','Lazer','Vestuário','Serviços','Outros'];
 var TRAVEL_CATS=['Transporte','Hospedagem','Alimentação','Passeios/Lazer','Outros'];
+var INV_TYPES=['CDB','Tesouro Direto','LCI/LCA','Ações','FIIs','Crypto','Poupança','Outro'];
 
 var DEFAULT_STATE={
   saldo:0,
@@ -562,7 +570,7 @@ function totaisMes(m){
   var e=0,s=0,inv=0;
   for(var i=0;i<S.items.length;i++){var l=S.items[i];
     if(m&&l.d.substring(0,7)!==m)continue;
-    if(l.t==='e')e+=l.v;else if(l.t==='s')s+=l.v;else if(l.t==='i'||l.t==='x')inv+=l.v;else if(l.t==='r')inv-=l.v;}
+    if(l.t==='e')e+=l.v;else if(l.t==='s')s+=l.v;else if(l.t==='i'||l.t==='x'||l.t==='y')inv+=l.v;else if(l.t==='r')inv-=l.v;}
   return{e:e,s:s,i:inv};
 }
 function viagemSaldo(){
@@ -632,6 +640,7 @@ function montaItem(l){
   if(l.t==='e'){cor='var(--green)';bg='#14532d';sinal='+';icon=CAT_ICONS[l.cat]||'📦';label=l.cat;badge='green';}
   else if(l.t==='i'||l.t==='x'){cor='var(--acc2)';bg='#1e3a5f';sinal='+';icon=CAT_ICONS[l.inv]||'📊';label=l.inv;badge='blue';if(l.t==='x')extra=' · 💼 externo';}
   else if(l.t==='r'){cor='var(--amber)';bg='#78350f';sinal='+';icon='↩️';label=l.inv+' (resgate)';badge='amber';extra=' · 🏦 p/ conta';}
+  else if(l.t==='y'){var pos=l.v>=0;cor=pos?'var(--acc4)':'var(--red)';bg=pos?'#0c3a4a':'#7f1d1d';sinal=pos?'+':'-';icon='💹';label=l.inv+' (ajuste)';badge=pos?'cyan':'red';}
   else if(l.t==='v'){cor='var(--acc4)';bg='#0c3a55';sinal='+';icon='✈️';label='Fundo de viagem';badge='cyan';}
   else if(l.t==='w'){cor='var(--amber)';bg='#78350f';sinal='+';icon='↩️';label='Uso do fundo de viagem';badge='amber';extra=' · 🏦 p/ conta';}
   else{cor='var(--red)';bg='#7f1d1d';sinal='-';icon=CAT_ICONS[l.cat]||'📦';label=l.cat;badge='red';}
@@ -639,7 +648,7 @@ function montaItem(l){
   div.innerHTML='<div class="ic" style="background:'+bg+'">'+icon+'</div>'+
     '<div class="info"><div class="desc">'+l.desc+'</div>'+
     '<div class="meta">'+new Date(l.d+'T00:00').toLocaleDateString('pt-BR')+' · <span class="badge '+badge+'">'+label+'</span>'+(l.rec?' · 🔄':'')+extra+'</div></div>'+
-    '<div class="amt" style="color:'+cor+'">'+sinal+fmt(l.v)+'</div>';
+    '<div class="amt" style="color:'+cor+'">'+sinal+fmt(Math.abs(l.v))+'</div>';
   var btn=document.createElement('button');btn.className='del';btn.textContent='🗑';
   btn.onclick=function(){excluir(l.id)};div.appendChild(btn);
   return div;
@@ -720,7 +729,7 @@ function renderLista(){
   var lista=S.items.filter(function(l){
     if(fm&&l.d.substring(0,7)!==fm)return false;
     if(ft){
-      if(ft==='i'){if(l.t!=='i'&&l.t!=='x'&&l.t!=='r')return false;}
+      if(ft==='i'){if(l.t!=='i'&&l.t!=='x'&&l.t!=='r'&&l.t!=='y')return false;}
       else if(ft==='v'){if(l.t!=='v'&&l.t!=='w')return false;}
       else if(l.t!==ft)return false;
     }
@@ -731,18 +740,24 @@ function renderLista(){
   else ul.innerHTML='<div class="empty">Nenhum lançamento encontrado.</div>';
 }
 
-function renderInv(){
+function calcInvsPorTipo(){
   var invs={};
   S.items.forEach(function(l){
-    if(l.t==='i'||l.t==='x')invs[l.inv]=(invs[l.inv]||0)+l.v;
+    if(l.t==='i'||l.t==='x'||l.t==='y')invs[l.inv]=(invs[l.inv]||0)+l.v;
     else if(l.t==='r')invs[l.inv]=(invs[l.inv]||0)-l.v;
   });
+  return invs;
+}
+
+function renderInv(){
+  var invs=calcInvsPorTipo();
   var posTypes=Object.keys(invs).filter(function(k){return invs[k]>0.005});
   var total=posTypes.reduce(function(a,k){return a+invs[k]},0);
   document.getElementById('inv-total').textContent=fmt(total);
   document.getElementById('inv-tipos').textContent=posTypes.length;
+  renderInvConfig(invs);
   var ul=document.getElementById('inv-lista');ul.innerHTML='';
-  var items=S.items.filter(function(l){return l.t==='i'||l.t==='x'||l.t==='r'});
+  var items=S.items.filter(function(l){return l.t==='i'||l.t==='x'||l.t==='r'||l.t==='y'});
   if(items.length){for(var i=0;i<items.length;i++)ul.appendChild(montaItem(items[i]));}
   else ul.innerHTML='<div class="empty">Nenhum investimento registrado.</div>';
   if(!hasChart){document.getElementById('card-pie').style.display='none';return}
@@ -753,6 +768,36 @@ function renderInv(){
   pieCh=new Chart(document.getElementById('pieChart'),{type:'doughnut',data:{labels:labels,datasets:[{data:labels.map(function(k){return invs[k]}),backgroundColor:PALETTE.slice(0,labels.length),borderWidth:2,borderColor:'#111827'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.label+': '+fmt(c.raw)+' ('+Math.round(c.raw/total*100)+'%)'}}}}}});
   var leg='';for(var k=0;k<labels.length;k++)leg+='<span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:3px;background:'+PALETTE[k]+';display:inline-block"></span>'+labels[k]+' '+Math.round(invs[labels[k]]/total*100)+'%</span>';
   document.getElementById('pie-leg').innerHTML=leg;
+}
+
+function renderInvConfig(invs){
+  var list=document.getElementById('invcfg-list');list.innerHTML='';
+  INV_TYPES.forEach(function(tipo){
+    var atual=invs[tipo]||0;
+    var row=document.createElement('div');row.className='budget-row';
+    row.innerHTML='<span class="nm">'+(CAT_ICONS[tipo]||'📊')+' '+tipo+' <span style="color:var(--text3);font-weight:400">('+fmt(atual)+')</span></span>';
+    var inp=document.createElement('input');inp.type='number';inp.step='0.01';inp.inputMode='decimal';inp.placeholder=atual.toFixed(2).replace('.',',');inp.dataset.tipo=tipo;inp.dataset.atual=atual;
+    row.appendChild(inp);list.appendChild(row);
+  });
+}
+
+function salvarConfigInvest(){
+  var inputs=document.getElementById('invcfg-list').querySelectorAll('input');
+  var hoje=hojeISO();var n=0;
+  inputs.forEach(function(inp){
+    if(inp.value===''||inp.value===null)return;
+    var novo=parseFloat(inp.value);
+    if(isNaN(novo))return;
+    var atual=parseFloat(inp.dataset.atual)||0;
+    var diff=novo-atual;
+    if(Math.abs(diff)<0.005)return;
+    var tipo=inp.dataset.tipo;
+    S.items.unshift({id:Date.now()+n,t:'y',desc:(diff>=0?'Ajuste de rendimento':'Ajuste de saldo')+' - '+tipo,v:diff,d:hoje,inv:tipo,rec:false});
+    n++;
+  });
+  if(n===0){alert('Nenhum valor alterado.');return}
+  save();renderInv();renderDash();
+  alert(n+' ajuste(s) registrado(s)!');
 }
 
 function salvarAporteExterno(){
@@ -777,7 +822,7 @@ function salvarResgate(){
   var tipo=document.getElementById('rg-inv').value;
   var disp=0;
   S.items.forEach(function(l){
-    if((l.t==='i'||l.t==='x')&&l.inv===tipo)disp+=l.v;
+    if((l.t==='i'||l.t==='x'||l.t==='y')&&l.inv===tipo)disp+=l.v;
     else if(l.t==='r'&&l.inv===tipo)disp-=l.v;
   });
   if(v>disp){if(!confirm('Você tem apenas '+fmt(disp)+' investido em '+tipo+'.\nBaixar mesmo assim?'))return}
