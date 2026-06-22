@@ -491,7 +491,18 @@ input[type=checkbox]{width:18px;height:18px;accent-color:var(--acc)}
       <div class="fg" style="margin-bottom:12px"><label>Valor (R$)</label><input type="number" id="i-valor" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
       <div class="fg" style="margin-bottom:12px"><label>Data</label><input type="date" id="i-data"></div>
     </div>
-    <div class="fg" id="row-cat"><label>Categoria</label><select id="i-cat"></select></div>
+    <div class="fg" id="row-cat">
+      <label>Categoria</label>
+      <select id="i-cat" onchange="toggleNovaCatModal(this.value)"></select>
+    </div>
+    <div class="fg" id="row-nova-cat" style="display:none">
+      <label>Nome da nova categoria</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="i-nova-cat" placeholder="Ex: Pet, Farmácia, Academia..." style="flex:1;padding:11px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg2);color:var(--text1);font-size:15px;outline:none">
+        <button class="btn small" style="width:auto;padding:11px 14px;white-space:nowrap" onclick="confirmarNovaCatModal()">✓ Criar</button>
+      </div>
+      <div class="hint">A categoria será salva e já selecionada automaticamente.</div>
+    </div>
     <div class="fg" id="row-inv" style="display:none"><label>Tipo de investimento</label>
       <select id="i-inv">
         <option>CDB</option><option>Tesouro Direto</option><option>LCI/LCA</option>
@@ -600,16 +611,44 @@ function abrir(tp){
   document.getElementById('i-desc').value='';
   document.getElementById('i-valor').value='';
   document.getElementById('i-rec').checked=false;
+  document.getElementById('i-nova-cat').value='';
+  document.getElementById('row-nova-cat').style.display='none';
   var titulos={entrada:'Nova Entrada',saida:'Nova Saída',investimento:'Novo Investimento'};
   document.getElementById('modal-titulo').textContent=titulos[tp];
   document.getElementById('row-cat').style.display=tp==='investimento'?'none':'flex';
   document.getElementById('row-inv').style.display=tp==='investimento'?'flex':'none';
-  // categoria options
   var sel=document.getElementById('i-cat');sel.innerHTML='';
   var opts=tp==='entrada'?['Salário','Freelance','Investimento resgatado','Outros']:S.cats;
   for(var i=0;i<opts.length;i++){var o=document.createElement('option');o.value=opts[i];o.textContent=opts[i];sel.appendChild(o);}
+  if(tp==='saida'){
+    var oNova=document.createElement('option');
+    oNova.value='__nova__';oNova.textContent='＋ Criar nova categoria...';
+    sel.appendChild(oNova);
+  }
   document.getElementById('modal').classList.add('open');
   setTimeout(function(){document.getElementById('i-desc').focus()},200);
+}
+
+function toggleNovaCatModal(val){
+  document.getElementById('row-nova-cat').style.display=val==='__nova__'?'flex':'none';
+  if(val==='__nova__')setTimeout(function(){document.getElementById('i-nova-cat').focus()},100);
+}
+
+function confirmarNovaCatModal(){
+  var nome=document.getElementById('i-nova-cat').value.trim();
+  if(!nome){alert('Digite o nome da categoria.');return}
+  if(S.cats.indexOf(nome)>-1){alert('Categoria "'+nome+'" já existe.');return}
+  S.cats.push(nome);save();
+  var sel=document.getElementById('i-cat');
+  // Remove a opção "nova" temporariamente, adiciona a cat, reinsere "nova" no fim
+  var optNova=sel.querySelector('option[value="__nova__"]');
+  if(optNova)sel.removeChild(optNova);
+  var o=document.createElement('option');o.value=nome;o.textContent=nome;sel.appendChild(o);
+  var oNova=document.createElement('option');oNova.value='__nova__';oNova.textContent='＋ Criar nova categoria...';sel.appendChild(oNova);
+  sel.value=nome;
+  document.getElementById('row-nova-cat').style.display='none';
+  document.getElementById('i-nova-cat').value='';
+  renderConfig();
 }
 function fechar(){document.getElementById('modal').classList.remove('open')}
 
@@ -620,9 +659,11 @@ function salvar(){
   if(!desc){alert('Informe a descrição.');return}
   if(!v||v<=0){alert('Informe um valor válido.');return}
   if(!d){alert('Informe a data.');return}
+  var catSel=document.getElementById('i-cat').value;
+  if(catSel==='__nova__'){alert('Crie a categoria antes de salvar (clique em "✓ Criar").');document.getElementById('i-nova-cat').focus();return}
   var l={id:Date.now(),t:tipoAtual==='entrada'?'e':tipoAtual==='saida'?'s':'i',desc:desc,v:v,d:d,rec:document.getElementById('i-rec').checked};
   if(tipoAtual==='investimento')l.inv=document.getElementById('i-inv').value;
-  else l.cat=document.getElementById('i-cat').value;
+  else l.cat=catSel;
   if((tipoAtual==='saida'||tipoAtual==='investimento')&&saldoCC()<v){
     if(!confirm('Saldo insuficiente em conta corrente!\nContinuar mesmo assim?'))return;
   }
